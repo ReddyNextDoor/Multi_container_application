@@ -1,0 +1,18 @@
+# Systemd service for Todo API SSL certificate renewal
+# Copy this file to /etc/systemd/system/ and enable it
+
+[Unit]
+Description=Todo API SSL Certificate Renewal
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/todo-api
+ExecStart=/opt/todo-api/scripts/ssl-manager.sh renew
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

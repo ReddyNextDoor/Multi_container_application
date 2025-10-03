@@ -1,0 +1,40 @@
+# Docker Compose override for development with Nginx
+# This file extends the base docker-compose.yml with Nginx reverse proxy
+version: '3.8'
+
+services:
+  # Override Todo API to remove external port (Nginx will handle it)
+  todo-api:
+    ports: []
+    expose:
+      - "3000"
+
+  # Add Nginx Reverse Proxy for development
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: todo-nginx-dev
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      # Use development Nginx configuration (no SSL)
+      - ./nginx/nginx-dev.conf:/etc/nginx/nginx.conf:ro
+      # Static files (if needed)
+      - ./nginx/static:/var/www/static:ro
+      # Nginx logs
+      - nginx_logs:/var/log/nginx
+    networks:
+      - todo-network
+    depends_on:
+      - todo-api
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# Add nginx logs volume
+volumes:
+  nginx_logs:
+    driver: local

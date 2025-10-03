@@ -1,0 +1,115 @@
+# Makefile for Todo API with Nginx Reverse Proxy
+# Usage: make -f Makefile.nginx <target>
+
+.PHONY: help dev prod ssl-setup ssl-renew logs clean
+
+# Default target
+help:
+	@echo "Todo API Nginx Management"
+	@echo "========================="
+	@echo ""
+	@echo "Available targets:"
+	@echo "  dev          - Start development environment with Nginx"
+	@echo "  prod         - Start production environment with SSL"
+	@echo "  ssl-setup    - Set up SSL certificates (requires DOMAIN and EMAIL)"
+	@echo "  ssl-renew    - Renew SSL certificates"
+	@echo "  logs         - Show nginx logs"
+	@echo "  logs-api     - Show API logs"
+	@echo "  logs-db      - Show database logs"
+	@echo "  test         - Test nginx configuration"
+	@echo "  reload       - Reload nginx configuration"
+	@echo "  stop         - Stop all services"
+	@echo "  clean        - Clean up containers and volumes"
+	@echo ""
+	@echo "Environment variables:"
+	@echo "  DOMAIN       - Domain name for SSL setup"
+	@echo "  EMAIL        - Email for Let's Encrypt registration"
+	@echo "  STAGING      - Use Let's Encrypt staging (true/false)"
+
+# Development environment with Nginx
+dev:
+	@echo "Starting development environment with Nginx..."
+	docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
+	@echo "Services started!"
+	@echo "API available at: http://localhost"
+	@echo "Direct API access: http://localhost:3001 (dev mode)"
+
+# Production environment
+prod:
+	@echo "Starting production environment..."
+	docker-compose -f docker-compose.nginx-prod.yml up -d
+	@echo "Production services started!"
+
+# SSL certificate setup
+ssl-setup:
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "Error: DOMAIN environment variable is required"; \
+		echo "Usage: make -f Makefile.nginx ssl-setup DOMAIN=your-domain.com EMAIL=your-email@domain.com"; \
+		exit 1; \
+	fi
+	@if [ -z "$(EMAIL)" ]; then \
+		echo "Error: EMAIL environment variable is required"; \
+		echo "Usage: make -f Makefile.nginx ssl-setup DOMAIN=your-domain.com EMAIL=your-email@domain.com"; \
+		exit 1; \
+	fi
+	@echo "Setting up SSL certificates for $(DOMAIN)..."
+	./scripts/setup-ssl.sh $(DOMAIN) $(EMAIL) $(STAGING)
+
+# Renew SSL certificates
+ssl-renew:
+	@echo "Renewing SSL certificates..."
+	@if [ -f "ssl/renew-certs.sh" ]; then \
+		./ssl/renew-certs.sh; \
+	else \
+		echo "Certificate renewal script not found. Run 'make ssl-setup' first."; \
+	fi
+
+# Show nginx logs
+logs:
+	docker-compose -f docker-compose.nginx-prod.yml logs -f nginx
+
+# Show API logs
+logs-api:
+	docker-compose -f docker-compose.nginx-prod.yml logs -f todo-api
+
+# Show database logs
+logs-db:
+	docker-compose -f docker-compose.nginx-prod.yml logs -f mongodb
+
+# Test nginx configuration
+test:
+	@echo "Testing nginx configuration..."
+	docker-compose -f docker-compose.nginx-prod.yml exec nginx nginx -t
+
+# Reload nginx configuration
+reload:
+	@echo "Reloading nginx configuration..."
+	docker-compose -f docker-compose.nginx-prod.yml exec nginx nginx -s reload
+
+# Stop all services
+stop:
+	@echo "Stopping all services..."
+	docker-compose -f docker-compose.yml -f docker-compose.override.yml down || true
+	docker-compose -f docker-compose.nginx-prod.yml down || true
+
+# Clean up containers and volumes
+clean: stop
+	@echo "Cleaning up containers and volumes..."
+	docker-compose -f docker-compose.yml -f docker-compose.override.yml down -v --remove-orphans || true
+	docker-compose -f docker-compose.nginx-prod.yml down -v --remove-orphans || true
+	docker system prune -f
+
+# Health check
+health:
+	@echo "Checking service health..."
+	@echo "Nginx:"
+	@curl -s -o /dev/null -w "%{http_code}" http://localhost/health || echo "Failed"
+	@echo ""
+	@echo "API (direct):"
+	@curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health || echo "Failed"
+
+# Show service status
+status:
+	@echo "Service Status:"
+	@echo "==============="
+	docker-compose -f docker-compose.nginx-prod.yml ps

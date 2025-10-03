@@ -1,0 +1,17 @@
+# Systemd timer for Todo API SSL certificate renewal
+# Copy this file to /etc/systemd/system/ and enable it
+
+[Unit]
+Description=Todo API SSL Certificate Renewal Timer
+Requires=todo-api-ssl-renewal.service
+
+[Timer]
+# Run twice daily at 00:00 and 12:00
+OnCalendar=*-*-* 00,12:00:00
+# Add randomization to avoid load spikes
+RandomizedDelaySec=3600
+# Ensure the timer persists across reboots
+Persistent=true
+
+[Install]
+WantedBy=timers.target
