@@ -1,0 +1,30 @@
+---
+# Application Configuration
+app_name: todo-api
+app_user: "{{ ansible_user }}"
+app_directory: "/home/{{ app_user }}/{{ app_name }}"
+
+# Docker Configuration
+docker_users:
+  - "{{ ansible_user }}"
+
+# Security Configuration
+ufw_rules:
+  - { port: 22, proto: tcp, rule: allow, comment: "SSH" }
+  - { port: 80, proto: tcp, rule: allow, comment: "HTTP" }
+  - { port: 443, proto: tcp, rule: allow, comment: "HTTPS" }
+
+# SSH Configuration
+ssh_port: 22
+disable_root_login: yes
+disable_password_auth: yes
+
+# Docker Hub Configuration (set via environment or command line)
+docker_hub_username: "{{ lookup('env', 'DOCKER_HUB_USERNAME') | default('') }}"
+docker_hub_password: "{{ lookup('env', 'DOCKER_HUB_PASSWORD') | default('') }}"
+
+# Application Environment Variables
+app_env_vars:
+  NODE_ENV: production
+  PORT: "{{ app_port }}"
+  MONGODB_URI: "mongodb://mongodb:{{ mongodb_port }}/todoapp"

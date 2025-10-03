@@ -1,0 +1,41 @@
+---
+- name: Update apt package cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install common packages
+  apt:
+    name:
+      - curl
+      - wget
+      - git
+      - htop
+      - vim
+      - tree
+      - jq
+      - net-tools
+      - software-properties-common
+    state: present
+
+- name: Set hostname
+  hostname:
+    name: "{{ inventory_hostname }}"
+  when: inventory_hostname is defined
+
+- name: Create application user if not exists
+  user:
+    name: "{{ app_user }}"
+    shell: /bin/bash
+    home: "/home/{{ app_user }}"
+    create_home: yes
+  when: app_user != ansible_user
+
+- name: Ensure .ssh directory exists for app user
+  file:
+    path: "/home/{{ app_user }}/.ssh"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0700'
+  when: app_user != ansible_user

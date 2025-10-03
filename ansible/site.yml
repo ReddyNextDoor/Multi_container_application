@@ -1,0 +1,24 @@
+---
+- name: Deploy Todo API Application
+  hosts: production
+  become: yes
+  gather_facts: yes
+  
+  roles:
+    - common
+    - docker
+    - security
+    - deploy
+
+  vars_files:
+    - vars/main.yml
+
+  handlers:
+    - name: restart docker
+      systemd:
+        name: docker
+        state: restarted
+        
+    - name: reload ufw
+      ufw:
+        state: reloaded

@@ -1,0 +1,104 @@
+---
+- name: Update all packages
+  apt:
+    upgrade: dist
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install security packages
+  apt:
+    name:
+      - ufw
+      - fail2ban
+      - unattended-upgrades
+      - apt-listchanges
+    state: present
+
+- name: Configure unattended upgrades
+  template:
+    src: 50unattended-upgrades.j2
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    backup: yes
+  notify: restart unattended-upgrades
+
+- name: Enable automatic updates
+  template:
+    src: 20auto-upgrades.j2
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    backup: yes
+
+- name: Configure SSH security
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    backup: yes
+  loop:
+    - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin {{ "no" if disable_root_login else "yes" }}' }
+    - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication {{ "no" if disable_password_auth else "yes" }}' }
+    - { regexp: '^#?Port', line: 'Port {{ ssh_port }}' }
+    - { regexp: '^#?Protocol', line: 'Protocol 2' }
+    - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+    - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 300' }
+    - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 2' }
+  notify: restart ssh
+
+- name: Reset UFW to defaults
+  ufw:
+    state: reset
+
+- name: Set UFW default policies
+  ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: 'incoming', policy: 'deny' }
+    - { direction: 'outgoing', policy: 'allow' }
+
+- name: Configure UFW rules
+  ufw:
+    rule: "{{ item.rule }}"
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    comment: "{{ item.comment | default('') }}"
+  loop: "{{ ufw_rules }}"
+  notify: reload ufw
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+
+- name: Configure fail2ban for SSH
+  template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    backup: yes
+  notify: restart fail2ban
+
+- name: Start and enable fail2ban
+  systemd:
+    name: fail2ban
+    state: started
+    enabled: yes
+
+- name: Start and enable unattended-upgrades
+  systemd:
+    name: unattended-upgrades
+    state: started
+    enabled: yes
+
+- name: Set timezone to UTC
+  timezone:
+    name: UTC
+
+- name: Configure system limits
+  pam_limits:
+    domain: '*'
+    limit_type: "{{ item.type }}"
+    limit_item: "{{ item.item }}"
+    value: "{{ item.value }}"
+  loop:
+    - { type: 'soft', item: 'nofile', value: '65536' }
+    - { type: 'hard', item: 'nofile', value: '65536' }
+    - { type: 'soft', item: 'nproc', value: '32768' }
+    - { type: 'hard', item: 'nproc', value: '32768' }

@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# MongoDB Backup Script for {{ app_name | title }}
+# Usage: ./backup-db.sh [backup_name]
+
+APP_DIR="{{ app_directory }}"
+BACKUP_DIR="$APP_DIR/backups"
+CONTAINER_NAME="{{ app_name }}-mongodb"
+DB_NAME="todoapp"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+BACKUP_NAME="${1:-backup_$TIMESTAMP}"
+
+# Create backup directory if it doesn't exist
+mkdir -p "$BACKUP_DIR"
+
+echo "Creating backup: $BACKUP_NAME"
+
+# Create MongoDB dump
+docker exec "$CONTAINER_NAME" mongodump --db "$DB_NAME" --out "/tmp/$BACKUP_NAME"
+
+# Copy backup from container to host
+docker cp "$CONTAINER_NAME:/tmp/$BACKUP_NAME" "$BACKUP_DIR/"
+
+# Compress backup
+cd "$BACKUP_DIR" || exit 1
+tar -czf "${BACKUP_NAME}.tar.gz" "$BACKUP_NAME"
+rm -rf "$BACKUP_NAME"
+
+# Clean up container
+docker exec "$CONTAINER_NAME" rm -rf "/tmp/$BACKUP_NAME"
+
+echo "Backup completed: $BACKUP_DIR/${BACKUP_NAME}.tar.gz"
+
+# Keep only last 7 backups
+find "$BACKUP_DIR" -name "backup_*.tar.gz" -type f -mtime +7 -delete
+
+echo "Old backups cleaned up (kept last 7 days)"

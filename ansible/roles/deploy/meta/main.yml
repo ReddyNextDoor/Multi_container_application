@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  author: DevOps Team
+  description: Deploy Todo API application using Docker Compose
+  company: Todo API Project
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+  galaxy_tags:
+    - deployment
+    - docker
+    - application
+    - nodejs
+
+dependencies:
+  - docker

@@ -1,0 +1,107 @@
+---
+- name: Create application directory
+  file:
+    path: "{{ app_directory }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Login to Docker Hub
+  docker_login:
+    username: "{{ docker_hub_username }}"
+    password: "{{ docker_hub_password }}"
+  when: docker_hub_username != "" and docker_hub_password != ""
+  no_log: true
+
+- name: Create docker-compose.yml for production
+  template:
+    src: docker-compose.prod.yml.j2
+    dest: "{{ app_directory }}/docker-compose.yml"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0644'
+  notify: restart application
+
+- name: Create environment file
+  template:
+    src: .env.j2
+    dest: "{{ app_directory }}/.env"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0600'
+  notify: restart application
+
+- name: Pull latest Docker images
+  docker_image:
+    name: "{{ item }}"
+    source: pull
+    force_source: yes
+  loop:
+    - "{{ docker_hub_username }}/{{ app_name }}:latest"
+    - "mongo:latest"
+  when: docker_hub_username != ""
+
+- name: Stop existing containers
+  docker_compose:
+    project_src: "{{ app_directory }}"
+    state: absent
+  ignore_errors: yes
+
+- name: Start application with Docker Compose
+  docker_compose:
+    project_src: "{{ app_directory }}"
+    state: present
+    pull: yes
+  become_user: "{{ app_user }}"
+
+- name: Wait for application to be ready
+  uri:
+    url: "http://localhost:{{ app_port }}/health"
+    method: GET
+    status_code: 200
+  register: health_check
+  until: health_check.status == 200
+  retries: 30
+  delay: 2
+  ignore_errors: yes
+
+- name: Create systemd service for application
+  template:
+    src: todo-api.service.j2
+    dest: "/etc/systemd/system/{{ app_name }}.service"
+    mode: '0644'
+  notify:
+    - reload systemd
+    - enable application service
+
+- name: Create application management script
+  template:
+    src: manage-app.sh.j2
+    dest: "{{ app_directory }}/manage-app.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Create backup script
+  template:
+    src: backup-db.sh.j2
+    dest: "{{ app_directory }}/backup-db.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Setup log rotation for application logs
+  template:
+    src: todo-api-logrotate.j2
+    dest: "/etc/logrotate.d/{{ app_name }}"
+    mode: '0644'
+
+- name: Display deployment status
+  debug:
+    msg: |
+      Application deployment completed!
+      - Application directory: {{ app_directory }}
+      - Health check status: {{ health_check.status | default('Failed') }}
+      - Service status: Use 'systemctl status {{ app_name }}' to check
+      - Logs: Use 'docker-compose -f {{ app_directory }}/docker-compose.yml logs' to view logs

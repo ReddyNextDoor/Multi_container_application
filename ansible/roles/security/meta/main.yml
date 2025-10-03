@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  author: DevOps Team
+  description: Security hardening for Ubuntu servers
+  company: Todo API Project
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+  galaxy_tags:
+    - security
+    - hardening
+    - firewall
+    - ssh
+
+dependencies: []

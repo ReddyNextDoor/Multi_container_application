@@ -1,0 +1,15 @@
+---
+- name: restart application
+  docker_compose:
+    project_src: "{{ app_directory }}"
+    restarted: yes
+  become_user: "{{ app_user }}"
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: enable application service
+  systemd:
+    name: "{{ app_name }}"
+    enabled: yes
