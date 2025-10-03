@@ -24,6 +24,11 @@ Configure these secrets in your GitHub repository settings (Settings > Secrets a
 - `SERVER_USER`: SSH username for the production server (e.g., 'ubuntu', 'root')
 - `SSH_PRIVATE_KEY`: Private SSH key for accessing the production server
 
+### AWS Configuration (for Integration Tests)
+- `AWS_ACCESS_KEY_ID`: AWS access key for integration testing
+- `AWS_SECRET_ACCESS_KEY`: AWS secret key for integration testing
+- `AWS_REGION`: AWS region for integration testing (optional, defaults to us-east-1)
+
 ## Setup Steps
 
 ### 1. Docker Hub Setup
@@ -56,11 +61,18 @@ Update your `ansible/site.yml` to use these variables for deployment.
 - Sets up Node.js environment
 - Installs dependencies with `npm ci`
 - Runs linting (if configured)
-- Executes tests with MongoDB service
+- Executes unit tests with MongoDB service
 - Generates test coverage
 
+### Integration Tests Job
+- Runs on main and develop branch pushes
+- Validates infrastructure configurations (Terraform)
+- Validates configuration management (Ansible)
+- Skips full deployment tests in CI to avoid costs
+- Uploads test results as artifacts
+
 ### Docker Build Job
-- Runs only on main branch pushes
+- Runs only on main branch pushes after successful tests
 - Builds Docker image using Buildx
 - Tags with branch name, SHA, and 'latest'
 - Pushes to Docker Hub registry
@@ -78,6 +90,25 @@ Update your `ansible/site.yml` to use these variables for deployment.
 - Runs after all other jobs complete
 - Reports deployment status
 - Provides deployment details
+
+## Full Integration Tests Workflow
+
+A separate workflow (`integration-tests.yml`) provides comprehensive testing:
+
+### Manual Trigger
+- Can be triggered manually from GitHub Actions UI
+- Allows selection of test type (all, infrastructure, ansible, deployment)
+- Configurable cleanup and verbose options
+
+### Scheduled Execution
+- Runs weekly on Sundays at 2 AM UTC
+- Performs full deployment validation
+- Helps catch infrastructure drift or configuration issues
+
+### Test Coverage
+- **Infrastructure Tests**: Terraform validation, AWS resource checks
+- **Ansible Tests**: Playbook syntax, role validation, template checks
+- **Deployment Tests**: Full deployment pipeline, health checks, data persistence
 
 ## Health Check Endpoint
 
@@ -148,7 +179,8 @@ Update package.json:
 The pipeline supports additional test types:
 - Unit tests: `npm test`
 - Integration tests: `npm run test:integration`
-- E2E tests: `npm run test:e2e`
+- Full integration tests: Manual trigger or scheduled workflow
+- E2E tests: `npm run test:e2e` (if implemented)
 
 ### Environment-Specific Deployments
 Modify the workflow to support staging/production:
@@ -177,11 +209,81 @@ For rollback issues:
 2. Check Docker Hub API access
 3. Verify rollback playbook execution
 
+## Integration Testing
+
+### Automated Integration Tests
+The CI pipeline includes automated integration tests that run on every push to main/develop branches:
+
+```yaml
+# Runs infrastructure and Ansible validation tests
+- Infrastructure configuration validation
+- Terraform syntax and resource checks
+- Ansible playbook and role validation
+- Security configuration verification
+```
+
+### Manual Integration Tests
+For comprehensive testing, use the manual integration test workflow:
+
+1. **Go to Actions tab** in your GitHub repository
+2. **Select "Full Integration Tests"** workflow
+3. **Click "Run workflow"** and configure options:
+   - **Test Type**: Choose from all, infrastructure, ansible, or deployment
+   - **Cleanup**: Whether to clean up resources after tests
+   - **Verbose**: Enable detailed logging
+
+### Integration Test Types
+
+#### Infrastructure Tests (`--type infrastructure`)
+- Validates Terraform configurations
+- Checks AWS resource availability
+- Verifies security group and network settings
+- Tests IAM roles and policies
+
+#### Ansible Tests (`--type ansible`)
+- Validates playbook syntax and structure
+- Checks role definitions and dependencies
+- Verifies template configurations
+- Tests handler configurations
+
+#### Deployment Tests (`--type deployment`)
+- **⚠️ Creates real AWS resources and incurs costs**
+- Provisions complete infrastructure
+- Configures servers with Ansible
+- Deploys and tests the application
+- Validates data persistence and backups
+
+### Local Integration Testing
+
+Run integration tests locally for development:
+
+```bash
+# Install dependencies
+npm install
+
+# Run specific test types
+./scripts/run-integration-tests.sh --type infrastructure
+./scripts/run-integration-tests.sh --type ansible
+
+# Run all tests (creates AWS resources)
+./scripts/run-integration-tests.sh --type all
+
+# Run with verbose output and no cleanup (for debugging)
+./scripts/run-integration-tests.sh --type infrastructure --verbose --no-cleanup
+```
+
+### Cost Considerations
+
+- **Infrastructure/Ansible tests**: No AWS costs (validation only)
+- **Deployment tests**: Minimal costs (~$0.01-0.05 per run for t3.micro instances)
+- **Scheduled tests**: Run weekly to catch configuration drift
+
 ## Next Steps
 
 After setting up the pipeline:
 1. Test with a small change to trigger the workflow
 2. Monitor the first few deployments closely
-3. Set up additional monitoring and alerting
-4. Consider adding deployment approvals for production
-5. Implement blue-green deployment for zero downtime
+3. Run manual integration tests to validate the complete pipeline
+4. Set up additional monitoring and alerting
+5. Consider adding deployment approvals for production
+6. Implement blue-green deployment for zero downtime

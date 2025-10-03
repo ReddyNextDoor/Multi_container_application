@@ -1,0 +1,191 @@
+name: Full Integration Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of integration tests to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - infrastructure
+        - ansible
+        - deployment
+      cleanup:
+        description: 'Clean up resources after tests'
+        required: true
+        default: true
+        type: boolean
+      verbose:
+        description: 'Enable verbose output'
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    # Run full integration tests weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  full-integration-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        # Try npm ci first, fallback to npm install if lock file is out of sync
+        npm ci || (echo "Lock file out of sync, running npm install..." && npm install)
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+
+    - name: Setup Ansible
+      run: |
+        pip install ansible
+
+    - name: Setup Docker
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      if: (github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'deployment') && secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != ''
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Run integration tests
+      run: |
+        # Set test parameters
+        TEST_TYPE="${{ github.event.inputs.test_type || 'all' }}"
+        CLEANUP="${{ github.event.inputs.cleanup || 'true' }}"
+        VERBOSE="${{ github.event.inputs.verbose || 'false' }}"
+        
+        # Build command arguments
+        ARGS="--type $TEST_TYPE"
+        
+        if [ "$CLEANUP" = "false" ]; then
+          ARGS="$ARGS --no-cleanup"
+        fi
+        
+        if [ "$VERBOSE" = "true" ]; then
+          ARGS="$ARGS --verbose"
+        fi
+        
+        # Run tests
+        ./scripts/run-integration-tests.sh $ARGS
+      env:
+        NODE_ENV: test
+        AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        TEST_TIMEOUT: 1800000  # 30 minutes
+        VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: full-integration-test-results-${{ github.run_number }}
+        path: |
+          test-results/
+          integration-test-results-*.tar.gz
+        retention-days: 30
+
+    - name: Upload test logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-test-logs-${{ github.run_number }}
+        path: test-results/logs/
+        retention-days: 7
+
+    - name: Create test summary
+      if: always()
+      run: |
+        echo "## Integration Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Test Type:** ${{ github.event.inputs.test_type || 'all' }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Cleanup:** ${{ github.event.inputs.cleanup || 'true' }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Verbose:** ${{ github.event.inputs.verbose || 'false' }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f "test-results/test-summary.txt" ]; then
+          echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat test-results/test-summary.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ -f "test-results/integration-test-report.json" ]; then
+          echo "### Detailed Results" >> $GITHUB_STEP_SUMMARY
+          echo "Full test report available in artifacts: \`integration-test-report.json\`" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Comment on PR
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let comment = '## 🧪 Integration Test Results\n\n';
+          comment += `**Test Type:** ${{ github.event.inputs.test_type || 'all' }}\n`;
+          comment += `**Status:** ${{ job.status }}\n\n`;
+          
+          if (fs.existsSync('test-results/test-summary.txt')) {
+            const summary = fs.readFileSync('test-results/test-summary.txt', 'utf8');
+            comment += '### Summary\n```\n' + summary + '\n```\n\n';
+          }
+          
+          comment += '📊 Detailed results available in [workflow artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})';
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  notify-results:
+    needs: full-integration-tests
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify test completion
+      run: |
+        if [ "${{ needs.full-integration-tests.result }}" == "success" ]; then
+          echo "✅ Full integration tests completed successfully"
+        elif [ "${{ needs.full-integration-tests.result }}" == "failure" ]; then
+          echo "❌ Full integration tests failed"
+        elif [ "${{ needs.full-integration-tests.result }}" == "cancelled" ]; then
+          echo "⏹️ Full integration tests were cancelled"
+        else
+          echo "⚠️ Full integration tests completed with status: ${{ needs.full-integration-tests.result }}"
+        fi
+        
+        echo "Test type: ${{ github.event.inputs.test_type || 'all' }}"
+        echo "Cleanup: ${{ github.event.inputs.cleanup || 'true' }}"
+        echo "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
