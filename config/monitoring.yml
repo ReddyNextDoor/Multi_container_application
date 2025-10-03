@@ -1,0 +1,118 @@
+# Monitoring Configuration for Todo API
+
+# Application monitoring
+application:
+  health_check:
+    endpoint: "/health"
+    interval: 30
+    timeout: 10
+    retries: 3
+    
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
+    collection_interval: 60
+    
+  performance:
+    response_time_threshold: 1000  # milliseconds
+    memory_threshold: 85           # percentage
+    cpu_threshold: 80              # percentage
+
+# Database monitoring
+database:
+  connection_pool:
+    max_connections: 20
+    min_connections: 5
+    idle_timeout: 30000
+    
+  performance:
+    slow_query_threshold: 1000     # milliseconds
+    connection_timeout: 5000       # milliseconds
+    
+  health_check:
+    command: "db.adminCommand('ping')"
+    interval: 30
+    timeout: 10
+
+# Infrastructure monitoring
+infrastructure:
+  disk_space:
+    threshold: 85                  # percentage
+    check_interval: 300            # seconds
+    
+  memory:
+    threshold: 90                  # percentage
+    check_interval: 60             # seconds
+    
+  network:
+    connection_timeout: 5000       # milliseconds
+    max_connections: 1000
+
+# Logging configuration
+logging:
+  level:
+    development: "debug"
+    staging: "debug"
+    production: "info"
+    
+  rotation:
+    max_size: "100MB"
+    max_files: 10
+    compress: true
+    
+  retention:
+    development: 7                 # days
+    staging: 14                    # days
+    production: 30                 # days
+
+# Alerting configuration
+alerts:
+  channels:
+    email:
+      enabled: false
+      smtp_server: ""
+      recipients: []
+      
+    webhook:
+      enabled: true
+      url: "${WEBHOOK_URL}"
+      timeout: 10
+      
+    slack:
+      enabled: false
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#alerts"
+      
+  rules:
+    - name: "API Down"
+      condition: "health_check_failed"
+      severity: "critical"
+      cooldown: 300
+      
+    - name: "High Memory Usage"
+      condition: "memory_usage > 90"
+      severity: "warning"
+      cooldown: 600
+      
+    - name: "High Disk Usage"
+      condition: "disk_usage > 85"
+      severity: "warning"
+      cooldown: 1800
+      
+    - name: "Database Connection Failed"
+      condition: "db_connection_failed"
+      severity: "critical"
+      cooldown: 300
+
+# Backup monitoring
+backup:
+  schedule_check:
+    enabled: true
+    interval: 3600                 # seconds
+    
+  success_notification:
+    enabled: true
+    
+  failure_notification:
+    enabled: true
+    retry_attempts: 3

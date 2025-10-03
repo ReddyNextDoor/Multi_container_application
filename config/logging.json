@@ -1,0 +1,58 @@
+{
+  "development": {
+    "level": "debug",
+    "format": "pretty",
+    "transports": [
+      {
+        "type": "console",
+        "colorize": true,
+        "timestamp": true
+      },
+      {
+        "type": "file",
+        "filename": "logs/development.log",
+        "maxsize": "10MB",
+        "maxFiles": 3
+      }
+    ]
+  },
+  "staging": {
+    "level": "debug",
+    "format": "json",
+    "transports": [
+      {
+        "type": "console",
+        "timestamp": true
+      },
+      {
+        "type": "file",
+        "filename": "logs/staging.log",
+        "maxsize": "50MB",
+        "maxFiles": 5
+      }
+    ]
+  },
+  "production": {
+    "level": "info",
+    "format": "json",
+    "transports": [
+      {
+        "type": "console",
+        "timestamp": true
+      },
+      {
+        "type": "file",
+        "filename": "logs/production.log",
+        "maxsize": "100MB",
+        "maxFiles": 10
+      }
+    ],
+    "errorFile": "logs/error.log",
+    "exceptionHandlers": [
+      {
+        "type": "file",
+        "filename": "logs/exceptions.log"
+      }
+    ]
+  }
+}

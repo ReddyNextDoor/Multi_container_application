@@ -1,0 +1,64 @@
+# Backup and Maintenance Configuration
+
+backup:
+  # Database backup settings
+  database:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention_days: 30
+    compression: true
+    backup_path: "/opt/todo-api/backups"
+    
+  # Application logs backup
+  logs:
+    enabled: true
+    schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+    retention_weeks: 8
+    compression: true
+    
+  # Docker volume backup
+  volumes:
+    enabled: true
+    schedule: "0 1 * * 0"  # Weekly on Sunday at 1 AM
+    retention_weeks: 4
+    
+maintenance:
+  # System updates
+  system_updates:
+    enabled: true
+    schedule: "0 4 * * 1"  # Weekly on Monday at 4 AM
+    auto_reboot: false
+    
+  # Docker cleanup
+  docker_cleanup:
+    enabled: true
+    schedule: "0 5 * * 0"  # Weekly on Sunday at 5 AM
+    remove_unused_images: true
+    remove_unused_volumes: false
+    
+  # Log rotation
+  log_rotation:
+    enabled: true
+    max_size: "100MB"
+    max_files: 10
+    compress: true
+    
+monitoring:
+  # Health checks
+  health_checks:
+    api_endpoint: "/health"
+    database_check: true
+    disk_space_threshold: 85  # Percentage
+    memory_threshold: 90      # Percentage
+    
+  # Alerts
+  alerts:
+    email_enabled: false
+    webhook_enabled: true
+    webhook_url: "${WEBHOOK_URL}"
+    
+  # Metrics collection
+  metrics:
+    enabled: true
+    interval: 60  # seconds
+    retention_days: 7
