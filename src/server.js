@@ -5,6 +5,9 @@ const dbConnection = require('./utils/database');
 
 const app = express();
 
+// Import routes
+const todosRoutes = require('./routes/todos');
+
 // Middleware configuration
 app.use(cors());
 app.use(express.json());
@@ -44,6 +47,9 @@ app.get('/health', async (req, res) => {
     });
   }
 });
+
+// Routes
+app.use('/todos', todosRoutes);
 
 // Basic route
 app.get('/', (req, res) => {
