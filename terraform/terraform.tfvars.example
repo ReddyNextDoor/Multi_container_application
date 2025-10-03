@@ -1,0 +1,22 @@
+# Example Terraform variables file
+# Copy this file to terraform.tfvars and customize the values
+
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Project Configuration
+project_name = "todo-api"
+environment  = "prod"
+
+# Instance Configuration
+instance_type = "t3.micro"
+key_pair_name = "your-key-pair-name"  # Replace with your actual key pair name
+
+# Security Configuration
+allowed_ssh_cidr = "0.0.0.0/0"  # Restrict this to your IP for better security
+
+# Storage Configuration
+volume_size = 20
+
+# Monitoring Configuration
+enable_monitoring = false
