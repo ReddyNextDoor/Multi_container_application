@@ -32,15 +32,15 @@
     mode: '0600'
   notify: restart application
 
-- name: Pull latest Docker images
+- name: Pull Docker images
   docker_image:
     name: "{{ item }}"
     source: pull
     force_source: yes
   loop:
-    - "{{ docker_hub_username }}/{{ app_name }}:latest"
-    - "mongo:latest"
-  when: docker_hub_username != ""
+    - "{{ docker_image_tag }}"
+    - "mongo:6.0"
+  when: docker_image_tag != ""
 
 - name: Stop existing containers
   docker_compose:

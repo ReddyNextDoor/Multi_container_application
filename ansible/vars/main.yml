@@ -23,8 +23,15 @@ disable_password_auth: yes
 docker_hub_username: "{{ lookup('env', 'DOCKER_HUB_USERNAME') | default('') }}"
 docker_hub_password: "{{ lookup('env', 'DOCKER_HUB_PASSWORD') | default('') }}"
 
+# Docker Image Configuration (can be overridden by CI/CD)
+docker_image_tag: "{{ docker_image_tag | default(docker_hub_username + '/' + app_name + ':latest') }}"
+
+# Application Configuration
+app_port: 3000
+mongodb_port: 27017
+
 # Application Environment Variables
 app_env_vars:
-  NODE_ENV: production
+  NODE_ENV: "{{ app_env | default('production') }}"
   PORT: "{{ app_port }}"
   MONGODB_URI: "mongodb://mongodb:{{ mongodb_port }}/todoapp"

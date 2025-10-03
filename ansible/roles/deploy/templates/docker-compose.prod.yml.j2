@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   mongodb:
-    image: mongo:latest
+    image: mongo:6.0
     container_name: {{ app_name }}-mongodb
     restart: unless-stopped
     environment:
@@ -19,7 +19,7 @@ services:
       start_period: 40s
 
   api:
-    image: {{ docker_hub_username }}/{{ app_name }}:latest
+    image: {{ docker_image_tag }}
     container_name: {{ app_name }}-api
     restart: unless-stopped
     ports:
