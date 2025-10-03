@@ -8,6 +8,9 @@
     "dev": "nodemon src/server.js",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "test:integration": "jest --config tests/integration/jest.config.js",
+    "test:integration:watch": "jest --config tests/integration/jest.config.js --watch",
+    "test:all": "npm run test && npm run test:integration",
     "lint": "echo 'Linting not configured yet' && exit 0"
   },
   "keywords": ["todo", "api", "nodejs", "express", "mongodb"],
@@ -22,6 +25,10 @@
   "devDependencies": {
     "nodemon": "^3.0.1",
     "jest": "^29.6.4",
-    "supertest": "^6.3.3"
+    "supertest": "^6.3.3",
+    "axios": "^1.5.0",
+    "js-yaml": "^4.1.0",
+    "jest-junit": "^16.0.0",
+    "aws-sdk": "^2.1467.0"
   }
 }
